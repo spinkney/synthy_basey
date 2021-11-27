@@ -10,13 +10,37 @@ mod_synth <- cmdstan_model(stan_file)
 
 smoking <- data.table(smoking)
 smoking_y <- dcast(smoking, year ~ state, value.var = "cigsale")
+summaries <- smoking %>%
+  group_by(state) %>%
+  summarize(retprice = mean(retprice, na.rm = TRUE),
+            lnincome = mean(lnincome, na.rm = TRUE),
+            age15to24 = mean(age15to24, na.rm = TRUE),
+            beer = mean(beer, na.rm = TRUE))
+
+sm1975 <- data.frame(smoking[year == 1975, "cigsale"],
+                     smoking[year == 1975, "state"])
+sm1980 <- data.frame(smoking[year == 1980, "cigsale"],
+                     smoking[year == 1980, "state"])
+sm1988 <- data.frame(smoking[year == 1988, "cigsale"],
+                     smoking[year == 1988, "state"])
+sm1975 <- rename(sm1975, cigsale1975 = cigsale)
+sm1980 <- rename(sm1980, cigsale1980 = cigsale)
+sm1988 <- rename(sm1988, cigsale1988 = cigsale)
+
+summaries <- inner_join(summaries, sm1975, by = "state")
+summaries <- inner_join(summaries, sm1980, by = "state")
+summaries <- inner_join(summaries, sm1988, by = "state")
+
+predictors_target <- t(as.matrix(summaries[summaries$state == "California", 2:8]))
+predictors_control <- t(as.matrix(summaries[summaries$state != "California", 2:8]))
+X_pred <- cbind(predictors_target, predictors_control)
+
 target <- "California"
 target_index <- which(names(smoking_y) == target)
 other_index <- which(names(smoking_y) %in% names(smoking_y)[c(-1, -4)])
 
 which(smoking_y$year == 1988)
 
-X_pred <- cbind(predictors_target[-1], predictors_control[-1])
 
 X_pred[3, ] <- log(X_pred[3, ] / (1 - X_pred[3, ]))
 
